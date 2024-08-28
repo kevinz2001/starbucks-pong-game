@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starbucks Breakout Pong</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; margin: 0 auto; background: #eee; }
+        #startBtn, #restartBtn, #gameOver { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 40px; 
+            padding: 20px; 
+            background-color: #4CAF50; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            display: none; 
+        }
+        #restartBtn { background-color: #f44336; top: 60%; }
+        #gameOver { color: red; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <button id="startBtn">START</button>
+    <button id="restartBtn">RESTART</button>
+    <div id="gameOver">WINNER</div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const brickRowCount = 8; // Filas de ladrillos
+        const brickColumnCount = Math.floor(canvas.width / 100);
+        const brickWidth = (canvas.width - (brickColumnCount + 1) * 10) / brickColumnCount;
+        const brickHeight = 30;
+
+        const ballSize = 15;
+        const paddleWidth = 150;
+        const paddleHeight = 10;
+        let paddleX, ballX, ballY, ballSpeedX, ballSpeedY, bricks, score, lives, isGameOver, isGameStarted;
+        const fallingItems = [];
+
+        document.getElementById('startBtn').style.display = 'block';
+
+        function initGame() {
+            paddleX = (canvas.width - paddleWidth) / 2;
+            ballX = canvas.width / 2;
+            ballY = canvas.height - paddleHeight - ballSize;
+            ballSpeedX = 10;
+            ballSpeedY = -10;
+            score = 0;
+            lives = 3;
+            isGameOver = false;
+            isGameStarted = false;
+
+            bricks = [];
+            for (let c = 0; c < brickColumnCount; c++) {
+                bricks[c] = [];
+                for (let r = 0; r < brickRowCount; r++) {
+                    let strength = Math.random() < 0.3 ? 2 : 1; // 30% de ladrillos con mayor resistencia
+                    bricks[c][r] = { x: c * (brickWidth + 10) + 10, y: r * (brickHeight + 10) + 30, status: strength };
+                }
+            }
+            fallingItems.length = 0;
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            isGameStarted = true;
+            document.getElementById('startBtn').style.display = 'none';
+            draw();
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            initGame();
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('restartBtn').style.display = 'none';
+            isGameStarted = true;
+            draw();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            let mouseX = e.clientX - canvas.offsetLeft;
+            if (mouseX > 0 && mouseX < canvas.width) {
+                paddleX = mouseX - paddleWidth / 2;
+            }
+        });
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.rect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBricks() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    if (bricks[c][r].status > 0) {
+                        ctx.beginPath();
+                        ctx.rect(bricks[c][r].x, bricks[c][r].y, brickWidth, brickHeight);
+                        ctx.fillStyle = bricks[c][r].status === 2 ? 'darkgreen' : 'green';
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        function drawFallingItems() {
+            for (let i = 0; i < fallingItems.length; i++) {
+                let item = fallingItems[i];
+                ctx.font = '20px Arial';
+                ctx.fillStyle = 'brown';
+                ctx.fillText(item.symbol, item.x, item.y);
+                item.y += 2; // Velocidad de caída
+                if (item.y > canvas.height) {
+                    fallingItems.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        function drawScore() {
+            ctx.font = '16px Arial';
+            ctx.fillStyle = 'black';
+            ctx.fillText('Score: ' + score, 8, 20);
+            ctx.fillText('Lives: ' + lives, canvas.width - 80, 20);
+        }
+
+        function collisionDetection() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    let b = bricks[c][r];
+                    if (b.status > 0) {
+                        if (ballX > b.x && ballX < b.x + brickWidth && ballY > b.y && ballY < b.y + brickHeight) {
+                            ballSpeedY = -ballSpeedY;
+                            b.status--;
+                            if (b.status === 0) {
+                                score++;
+                                let items = ['☕', '🍰', '🍩', '🍪', '🍵'];
+                                let symbol = items[Math.floor(Math.random() * items.length)];
+                                fallingItems.push({ symbol: symbol, x: b.x + brickWidth / 2, y: b.y + brickHeight / 2 });
+                            }
+                            if (score === brickRowCount * brickColumnCount) {
+                                document.getElementById('gameOver').textContent = 'WINNER';
+                                document.getElementById('gameOver').style.display = 'block';
+                                isGameOver = true;
+                                document.getElementById('restartBtn').style.display = 'block';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            if (isGameOver || !isGameStarted) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBricks();
+            drawBall();
+            drawPaddle();
+            drawFallingItems();
+            drawScore();
+
+            if (ballX + ballSpeedX > canvas.width - ballSize || ballX + ballSpeedX < ballSize) {
+                ballSpeedX = -ballSpeedX;
+            }
+            if (ballY + ballSpeedY < ballSize) {
+                ballSpeedY = -ballSpeedY;
+            } else if (ballY + ballSpeedY > canvas.height - ballSize) {
+                if (ballX > paddleX && ballX < paddleX + paddleWidth) {
+                    ballSpeedY = -ballSpeedY;
+                } else {
+                    lives--;
+                    if (!lives) {
+                        document.getElementById('gameOver').textContent = 'GAME OVER';
+                        document.getElementById('gameOver').style.display = 'block';
+                        isGameOver = true;
+                        document.getElementById('restartBtn').style.display = 'block';
+                    } else {
+                        ballX = canvas.width / 2;
+                        ballY = canvas.height - paddleHeight - ballSize;
+                        ballSpeedX = 10;
+                        ballSpeedY = -10;
+                        paddleX = (canvas.width - paddleWidth) / 2;
+                    }
+                }
+            }
+
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+            collisionDetection();
+            requestAnimationFrame(draw);
+        }
+
+        initGame(); // Inicializa el juego al cargar
+    </script>
+</body>
+</html>
